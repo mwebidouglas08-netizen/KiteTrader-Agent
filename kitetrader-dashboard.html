@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>KiteTrader — Autonomous AI Trading Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #080c10;
+    --surface: #0d1117;
+    --surface2: #131920;
+    --border: rgba(0,210,130,0.12);
+    --border2: rgba(0,210,130,0.25);
+    --green: #00d282;
+    --green-dim: rgba(0,210,130,0.08);
+    --green-glow: rgba(0,210,130,0.3);
+    --red: #ff4560;
+    --red-dim: rgba(255,69,96,0.08);
+    --amber: #ffb547;
+    --blue: #3b82f6;
+    --text: #e8f0f5;
+    --text2: #7a9bb0;
+    --text3: #405060;
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-display);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid noise background */
+  body::before {
+    content:'';
+    position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:
+      linear-gradient(rgba(0,210,130,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,210,130,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: sticky; top:0; z-index: 100;
+    background: rgba(8,12,16,0.9);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex; align-items:center; gap:1.5rem;
+    height: 56px;
+  }
+  .logo {
+    display:flex; align-items:center; gap: 0.6rem;
+    font-size: 1.1rem; font-weight: 700; letter-spacing:-0.02em;
+  }
+  .logo-mark {
+    width: 28px; height: 28px; border-radius: 6px;
+    background: var(--green);
+    display:flex; align-items:center; justify-content:center;
+    font-size: 14px;
+  }
+  .kite-badge {
+    font-size: 10px; font-family: var(--font-mono);
+    background: var(--green-dim); color: var(--green);
+    border: 1px solid var(--border2);
+    padding: 2px 8px; border-radius: 99px;
+    letter-spacing: 0.05em;
+  }
+  .header-right { margin-left:auto; display:flex; align-items:center; gap:1rem; }
+  .agent-status {
+    display:flex; align-items:center; gap:6px;
+    font-size: 12px; font-family: var(--font-mono);
+    color: var(--text2);
+  }
+  .status-dot {
+    width:7px; height:7px; border-radius:50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .btn-primary {
+    background: var(--green); color: #000;
+    border:none; padding: 7px 16px;
+    border-radius: 6px; font-family: var(--font-display);
+    font-weight: 600; font-size: 13px; cursor:pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary:hover { transform:translateY(-1px); box-shadow: 0 4px 20px var(--green-glow); }
+  .btn-ghost {
+    background: none; border: 1px solid var(--border2);
+    color: var(--text2); padding: 7px 16px;
+    border-radius: 6px; font-family: var(--font-display);
+    font-size: 13px; cursor:pointer; transition: all 0.15s;
+  }
+  .btn-ghost:hover { border-color: var(--green); color: var(--green); }
+
+  /* ── MAIN LAYOUT ── */
+  .layout {
+    position: relative; z-index:1;
+    display: grid;
+    grid-template-columns: 280px 1fr 320px;
+    grid-template-rows: auto 1fr;
+    gap: 1px;
+    height: calc(100vh - 56px);
+    background: var(--border);
+  }
+  .panel {
+    background: var(--surface);
+    overflow-y: auto;
+  }
+  .panel::-webkit-scrollbar { width:4px; }
+  .panel::-webkit-scrollbar-track { background: transparent; }
+  .panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius:2px; }
+
+  /* ── PANEL HEADERS ── */
+  .panel-header {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    display:flex; align-items:center; gap:8px;
+    position: sticky; top:0; z-index:10;
+    background: var(--surface);
+  }
+  .panel-title {
+    font-size: 11px; font-family: var(--font-mono);
+    color: var(--text2); letter-spacing: 0.1em; text-transform: uppercase;
+    flex:1;
+  }
+  .panel-badge {
+    font-size:10px; font-family: var(--font-mono);
+    padding:2px 7px; border-radius:99px;
+    background: var(--green-dim); color: var(--green);
+    border: 1px solid var(--border2);
+  }
+
+  /* ── LEFT PANEL: MARKETS ── */
+  .market-item {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor:pointer; transition: background 0.1s;
+    display:grid; grid-template-columns: 1fr auto;
+    gap:2px; align-items:center;
+  }
+  .market-item:hover, .market-item.active { background: var(--green-dim); }
+  .market-item.active { border-left: 2px solid var(--green); }
+  .market-name { font-size:13px; font-weight:600; }
+  .market-sub { font-size:10px; color:var(--text3); font-family:var(--font-mono); }
+  .market-price { font-size:13px; font-family:var(--font-mono); font-weight:500; text-align:right; }
+  .market-chg { font-size:10px; font-family:var(--font-mono); text-align:right; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .neutral { color: var(--text2); }
+
+  /* ── CENTER PANEL ── */
+  .center-panel {
+    display:grid;
+    grid-template-rows: 340px 1fr;
+    gap: 1px;
+    background: var(--border);
+  }
+
+  /* Chart area */
+  .chart-area {
+    background: var(--surface);
+    padding: 16px;
+    position: relative;
+  }
+  .chart-header {
+    display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:12px;
+  }
+  .chart-symbol { font-size: 1.5rem; font-weight: 800; letter-spacing:-0.03em; }
+  .chart-price { font-size: 1.5rem; font-weight: 800; font-family: var(--font-mono); color: var(--green); }
+  .chart-info { font-size:11px; color:var(--text2); font-family:var(--font-mono); margin-top:2px; }
+  .timeframe-tabs { display:flex; gap:4px; margin-bottom:12px; }
+  .tf-tab {
+    font-size:10px; font-family:var(--font-mono);
+    padding:3px 9px; border-radius:4px;
+    border: 1px solid var(--border);
+    background:none; color:var(--text3); cursor:pointer; transition:all 0.1s;
+  }
+  .tf-tab.active, .tf-tab:hover { background:var(--green-dim); color:var(--green); border-color:var(--border2); }
+  canvas#priceChart { width:100% !important; height:180px !important; }
+
+  /* Agent signals */
+  .signals-panel { background: var(--surface); overflow-y:auto; }
+  .signal-row {
+    display:grid; grid-template-columns: auto 1fr auto auto;
+    gap:10px; align-items:center;
+    padding: 9px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size:12px; font-family: var(--font-mono);
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+  .sig-type {
+    padding:2px 8px; border-radius:4px; font-size:10px; font-weight:500;
+    text-transform:uppercase; letter-spacing:0.05em;
+  }
+  .sig-buy { background:rgba(0,210,130,0.12); color:var(--green); border:1px solid rgba(0,210,130,0.2); }
+  .sig-sell { background:rgba(255,69,96,0.12); color:var(--red); border:1px solid rgba(255,69,96,0.2); }
+  .sig-hold { background:rgba(255,181,71,0.12); color:var(--amber); border:1px solid rgba(255,181,71,0.2); }
+  .sig-pair { color: var(--text); font-weight:500; }
+  .sig-confidence { color:var(--green); }
+  .sig-time { color: var(--text3); font-size:10px; }
+
+  /* ── RIGHT PANEL: AGENT + KITE ── */
+  .right-panel {
+    display:grid;
+    grid-template-rows: auto 1fr;
+    gap: 1px;
+    background: var(--border);
+  }
+  .agent-card { background: var(--surface); padding: 16px; }
+  .agent-header { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .agent-avatar {
+    width:40px; height:40px; border-radius:10px;
+    background: linear-gradient(135deg, var(--green) 0%, #00a86b 100%);
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; flex-shrink:0;
+  }
+  .agent-name { font-size:14px; font-weight:700; }
+  .agent-desc { font-size:10px; color:var(--text2); font-family:var(--font-mono); margin-top:1px; }
+
+  .metric-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+  .metric-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius:8px; padding:10px 12px;
+  }
+  .metric-label { font-size:9px; font-family:var(--font-mono); color:var(--text3); text-transform:uppercase; letter-spacing:0.1em; }
+  .metric-value { font-size:16px; font-family:var(--font-mono); font-weight:500; margin-top:2px; }
+
+  .controls { display:flex; flex-direction:column; gap:8px; }
+  .control-row { display:flex; gap:6px; }
+  .control-row .btn-primary, .control-row .btn-ghost { flex:1; font-size:12px; padding:8px; }
+  .btn-danger {
+    background:none; border:1px solid rgba(255,69,96,0.3);
+    color:var(--red); padding:8px; border-radius:6px;
+    font-family:var(--font-display); font-size:12px; cursor:pointer; transition:all 0.15s; flex:1;
+  }
+  .btn-danger:hover { background: var(--red-dim); }
+
+  /* Kite chain feed */
+  .kite-feed { background:var(--surface); overflow-y:auto; }
+  .kite-tx {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    animation: fadeIn 0.4s ease;
+  }
+  .kite-tx-header {
+    display:flex; align-items:center; gap:8px; margin-bottom:4px;
+  }
+  .kite-icon {
+    width:22px; height:22px; border-radius:4px;
+    background: var(--green-dim); border: 1px solid var(--border2);
+    display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0;
+  }
+  .kite-tx-type { font-size:11px; font-weight:600; }
+  .kite-tx-time { font-size:10px; color:var(--text3); font-family:var(--font-mono); margin-left:auto; }
+  .kite-tx-hash {
+    font-size:9px; font-family:var(--font-mono); color:var(--text3);
+    word-break:break-all; line-height:1.4;
+  }
+  .kite-tx-detail {
+    font-size:10px; color:var(--text2); font-family:var(--font-mono); margin-top:3px;
+  }
+  .kite-confirmed { color: var(--green); font-size:9px; font-family:var(--font-mono); }
+
+  /* Config row */
+  .config-section { padding:14px 16px; border-bottom:1px solid var(--border); }
+  .config-title { font-size:10px; font-family:var(--font-mono); color:var(--text3); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:10px; }
+  .config-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .config-label { font-size:11px; color:var(--text2); flex:1; }
+  .toggle {
+    width:34px; height:18px; border-radius:9px;
+    background: var(--green); border:none; cursor:pointer; position:relative; transition:background 0.2s;
+  }
+  .toggle.off { background: var(--surface2); border:1px solid var(--border2); }
+  .toggle::after {
+    content:''; position:absolute; top:2px; right:2px;
+    width:14px; height:14px; border-radius:50%; background:white; transition:all 0.2s;
+  }
+  .toggle.off::after { right:auto; left:2px; background:var(--text3); }
+  .select-sm {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text2); padding: 3px 8px; border-radius:5px;
+    font-size:11px; font-family:var(--font-mono); cursor:pointer;
+  }
+
+  /* Slider */
+  .risk-slider { width:100%; margin-top:6px; }
+  input[type=range] {
+    -webkit-appearance:none; width:100%; height:4px;
+    background: var(--border2); border-radius:2px; outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none; width:14px; height:14px;
+    border-radius:50%; background:var(--green); cursor:pointer;
+  }
+
+  /* Onboarding modal */
+  .modal-overlay {
+    position:fixed; inset:0; z-index:1000;
+    background:rgba(0,0,0,0.85); backdrop-filter:blur(8px);
+    display:flex; align-items:center; justify-content:center;
+    padding:1rem;
+  }
+  .modal-overlay.hidden { display:none; }
+  .modal {
+    background:var(--surface);
+    border:1px solid var(--border2);
+    border-radius:16px; padding:2rem;
+    max-width:500px; width:100%;
+    box-shadow: 0 0 60px rgba(0,210,130,0.08);
+  }
+  .modal-logo { font-size:2rem; margin-bottom:1rem; }
+  .modal h2 { font-size:1.4rem; font-weight:800; margin-bottom:0.4rem; letter-spacing:-0.02em; }
+  .modal p { font-size:13px; color:var(--text2); line-height:1.6; margin-bottom:1.2rem; }
+  .modal-features { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:1.5rem; }
+  .feat {
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:8px; padding:10px 12px;
+    font-size:11px; font-family:var(--font-mono); color:var(--text2);
+    display:flex; align-items:center; gap:6px;
+  }
+  .feat-icon { color:var(--green); font-size:14px; }
+  .input-group { margin-bottom:10px; }
+  .input-label { font-size:11px; color:var(--text2); margin-bottom:4px; display:block; font-family:var(--font-mono); }
+  .input-field {
+    width:100%; background:var(--surface2); border:1px solid var(--border);
+    color:var(--text); padding:8px 12px; border-radius:8px;
+    font-family:var(--font-mono); font-size:12px; outline:none; transition:border-color 0.15s;
+  }
+  .input-field:focus { border-color:var(--green); }
+  .input-field::placeholder { color:var(--text3); }
+
+  /* Toast */
+  .toast {
+    position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999;
+    background:var(--surface2); border:1px solid var(--border2);
+    border-left: 3px solid var(--green);
+    padding: 10px 16px; border-radius:8px;
+    font-size:12px; font-family:var(--font-mono); color:var(--text2);
+    animation: slideIn 0.3s ease;
+    max-width:300px;
+  }
+  .toast.err { border-left-color:var(--red); }
+  @keyframes slideIn { from{transform:translateX(20px);opacity:0} to{transform:translateX(0);opacity:1} }
+  .toast-title { color:var(--text); font-weight:500; margin-bottom:2px; }
+
+  /* Analytics bar at bottom */
+  .analytics-bar {
+    grid-column: 1/-1;
+    background:var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 8px 20px;
+    display:flex; align-items:center; gap:2rem;
+    font-size:11px; font-family:var(--font-mono); color:var(--text3);
+  }
+  .analytics-bar .stat { display:flex; gap:6px; align-items:center; }
+  .analytics-bar .val { color:var(--text); }
+  .analytics-bar .val.pos { color:var(--green); }
+  .analytics-bar .val.neg { color:var(--red); }
+  .kite-chain-id {
+    margin-left:auto; color:var(--green); display:flex; align-items:center; gap:6px;
+  }
+  .kite-chain-id::before {
+    content:''; width:6px; height:6px; border-radius:50%; background:var(--green);
+    animation:pulse 2s infinite;
+  }
+
+  /* Responsive */
+  @media(max-width:1100px) {
+    .layout { grid-template-columns: 240px 1fr 280px; }
+  }
+  @media(max-width:800px) {
+    .layout { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; height:auto; }
+    header { padding: 0 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ONBOARDING MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-logo">🪁</div>
+    <h2>KiteTrader Agent</h2>
+    <p>Autonomous AI trading agent that analyses crypto markets, executes trades, and settles every action on <strong>Kite chain</strong> for full auditability.</p>
+    <div class="modal-features">
+      <div class="feat"><span class="feat-icon">🤖</span> Autonomous agent</div>
+      <div class="feat"><span class="feat-icon">⛓</span> Kite on-chain settlement</div>
+      <div class="feat"><span class="feat-icon">📊</span> Real-time signals</div>
+      <div class="feat"><span class="feat-icon">🔐</span> Scoped keys</div>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Your Kite Wallet Address</label>
+      <input class="input-field" id="walletInput" placeholder="0x... (or click Generate Demo Key)" />
+    </div>
+    <div class="input-group">
+      <label class="input-label">Risk Profile</label>
+      <select class="input-field" id="riskInput">
+        <option value="conservative">Conservative (max 1% per trade)</option>
+        <option value="moderate" selected>Moderate (max 3% per trade)</option>
+        <option value="aggressive">Aggressive (max 5% per trade)</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:1rem;">
+      <button class="btn-ghost" style="flex:1;padding:10px;" onclick="generateDemoKey()">Generate Demo Key</button>
+      <button class="btn-primary" style="flex:1;padding:10px;font-size:14px;" onclick="launchAgent()">Launch Agent →</button>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">🪁</div>
+    KiteTrader
+  </div>
+  <span class="kite-badge">KITE CHAIN</span>
+  <div class="header-right">
+    <div class="agent-status">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Agent Active</span>
+    </div>
+    <button class="btn-ghost" onclick="toggleAgent()">Pause Agent</button>
+    <button class="btn-primary" onclick="showModal()">+ New Strategy</button>
+  </div>
+</header>
+
+<!-- MAIN LAYOUT -->
+<div class="layout">
+
+  <!-- LEFT: Market Watchlist -->
+  <div class="panel" id="marketPanel">
+    <div class="panel-header">
+      <span class="panel-title">Markets</span>
+      <span class="panel-badge" id="marketCount">8 pairs</span>
+    </div>
+    <div id="marketList"></div>
+
+    <!-- Config -->
+    <div class="config-section">
+      <div class="config-title">Agent Config</div>
+      <div class="config-row">
+        <span class="config-label">Auto-execute trades</span>
+        <button class="toggle" id="toggleAutoTrade" onclick="toggleOption(this)"></button>
+      </div>
+      <div class="config-row">
+        <span class="config-label">On-chain attestation</span>
+        <button class="toggle" id="toggleAttest" onclick="toggleOption(this)"></button>
+      </div>
+      <div class="config-row">
+        <span class="config-label">Multi-agent mode</span>
+        <button class="toggle off" id="toggleMulti" onclick="toggleOption(this)"></button>
+      </div>
+      <div class="config-row">
+        <span class="config-label">Timeframe</span>
+        <select class="select-sm" id="tfSelect" onchange="changeTF(this.value)">
+          <option>1m</option><option selected>5m</option><option>15m</option><option>1h</option>
+        </select>
+      </div>
+      <div style="margin-top:10px">
+        <div class="config-label" style="font-size:10px;color:var(--text3);font-family:var(--font-mono);margin-bottom:6px;">RISK PER TRADE: <span id="riskLabel" style="color:var(--amber)">2%</span></div>
+        <input type="range" class="risk-slider" min="0.5" max="5" step="0.5" value="2" oninput="document.getElementById('riskLabel').textContent=this.value+'%'"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER: Chart + Signals -->
+  <div class="center-panel">
+    <!-- Chart -->
+    <div class="chart-area">
+      <div class="chart-header">
+        <div>
+          <div class="chart-symbol" id="chartSymbol">BTC/USDT</div>
+          <div class="chart-info" id="chartInfo">24h Vol: $28.4B · Market Cap: $1.24T</div>
+        </div>
+        <div style="text-align:right">
+          <div class="chart-price" id="chartPrice">$67,432</div>
+          <div class="chart-info pos" id="chartChg">+2.34%</div>
+        </div>
+      </div>
+      <div class="timeframe-tabs">
+        <button class="tf-tab active" onclick="setTF(this,'1m')">1m</button>
+        <button class="tf-tab" onclick="setTF(this,'5m')">5m</button>
+        <button class="tf-tab" onclick="setTF(this,'15m')">15m</button>
+        <button class="tf-tab" onclick="setTF(this,'1h')">1h</button>
+        <button class="tf-tab" onclick="setTF(this,'4h')">4h</button>
+        <button class="tf-tab" onclick="setTF(this,'1d')">1d</button>
+      </div>
+      <canvas id="priceChart"></canvas>
+    </div>
+
+    <!-- Signals feed -->
+    <div class="signals-panel panel">
+      <div class="panel-header">
+        <span class="panel-title">Agent Signals</span>
+        <span class="panel-badge" id="sigCount">0 signals</span>
+      </div>
+      <div id="signalsList"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Agent + Kite feed -->
+  <div class="right-panel">
+    <!-- Agent metrics -->
+    <div class="agent-card">
+      <div class="agent-header">
+        <div class="agent-avatar">🤖</div>
+        <div>
+          <div class="agent-name">KiteTrader v1.0</div>
+          <div class="agent-desc" id="agentWallet">0x...loading</div>
+        </div>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="metric-label">P&L Today</div>
+          <div class="metric-value pos" id="pnl">+$0.00</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Win Rate</div>
+          <div class="metric-value" id="winRate">0%</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Trades</div>
+          <div class="metric-value" id="tradeCount">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Kite Txns</div>
+          <div class="metric-value pos" id="kiteTxCount">0</div>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="control-row">
+          <button class="btn-primary" onclick="forceSignal('BUY')">Force BUY</button>
+          <button class="btn-danger" onclick="forceSignal('SELL')">Force SELL</button>
+        </div>
+        <button class="btn-ghost" style="width:100%;padding:8px;font-size:12px;" onclick="attestNow()">⛓ Attest Portfolio State</button>
+      </div>
+    </div>
+
+    <!-- Kite chain feed -->
+    <div class="kite-feed panel">
+      <div class="panel-header">
+        <span class="panel-title">Kite Chain</span>
+        <span class="panel-badge" id="kiteCount">Live</span>
+      </div>
+      <div id="kiteList"></div>
+    </div>
+  </div>
+
+  <!-- Bottom analytics bar -->
+  <div class="analytics-bar">
+    <div class="stat">Portfolio <span class="val" id="portfolioVal">$10,000.00</span></div>
+    <div class="stat">Open Positions <span class="val" id="openPos">0</span></div>
+    <div class="stat">Sharpe Ratio <span class="val pos" id="sharpe">—</span></div>
+    <div class="stat">Max Drawdown <span class="val neg" id="drawdown">—</span></div>
+    <div class="stat">Agent Uptime <span class="val" id="uptime">00:00</span></div>
+    <div class="kite-chain-id">Kite Testnet · Chain ID: 2368</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+const STATE = {
+  wallet: '',
+  agentRunning: true,
+  portfolio: 10000,
+  pnl: 0,
+  trades: 0,
+  wins: 0,
+  kiteTxns: 0,
+  openPositions: 0,
+  startTime: Date.now(),
+  signals: [],
+  kiteTxList: [],
+  activeMarket: 'BTC/USDT',
+  priceData: {},
+  riskProfile: 'moderate',
+};
+
+const MARKETS = [
+  { pair:'BTC/USDT', base:'Bitcoin',  price:67432, chg:2.34 },
+  { pair:'ETH/USDT', base:'Ethereum', price:3521,  chg:1.87 },
+  { pair:'SOL/USDT', base:'Solana',   price:178,   chg:4.12 },
+  { pair:'AVAX/USDT',base:'Avalanche',price:41.2,  chg:-1.23 },
+  { pair:'LINK/USDT',base:'Chainlink',price:18.4,  chg:3.45 },
+  { pair:'ARB/USDT', base:'Arbitrum', price:1.23,  chg:-0.87 },
+  { pair:'OP/USDT',  base:'Optimism', price:2.87,  chg:2.01 },
+  { pair:'INJ/USDT', base:'Injective',price:34.5,  chg:5.67 },
+];
+
+// ── PRICE SIMULATION ───────────────────────────────────────────────────────
+function initPrices() {
+  MARKETS.forEach(m => {
+    const pts = 60;
+    const prices = [];
+    let p = m.price * 0.97;
+    for(let i=0;i<pts;i++) {
+      p += (Math.random()-0.48)*p*0.003;
+      prices.push(parseFloat(p.toFixed(m.price>100?2:4)));
+    }
+    STATE.priceData[m.pair] = prices;
+  });
+}
+
+function tickPrices() {
+  MARKETS.forEach(m => {
+    const arr = STATE.priceData[m.pair];
+    const last = arr[arr.length-1];
+    const next = last * (1 + (Math.random()-0.49)*0.004);
+    arr.push(parseFloat(next.toFixed(m.price>100?2:4)));
+    if(arr.length>120) arr.shift();
+    m.price = next;
+    m.chg += (Math.random()-0.5)*0.1;
+    m.chg = parseFloat(m.chg.toFixed(2));
+  });
+}
+
+// ── CHART ─────────────────────────────────────────────────────────────────
+let chart;
+function initChart() {
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  const data = STATE.priceData[STATE.activeMarket];
+  chart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: data.map((_,i)=>i),
+      datasets:[{
+        data,
+        borderColor:'#00d282',
+        borderWidth:1.5,
+        fill:true,
+        backgroundColor:(ctx2)=>{
+          const g=ctx2.chart.ctx.createLinearGradient(0,0,0,180);
+          g.addColorStop(0,'rgba(0,210,130,0.15)');
+          g.addColorStop(1,'rgba(0,210,130,0)');
+          return g;
+        },
+        tension:0.4,
+        pointRadius:0,
+        pointHoverRadius:4,
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      animation:{duration:0},
+      plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'rgba(13,17,23,0.95)',
+        borderColor:'rgba(0,210,130,0.3)',borderWidth:1,
+        titleColor:'#7a9bb0',bodyColor:'#e8f0f5',
+        callbacks:{label:ctx=>` $${ctx.parsed.y.toLocaleString()}`}
+      }},
+      scales:{
+        x:{display:false},
+        y:{
+          position:'right',
+          grid:{color:'rgba(0,210,130,0.06)'},
+          ticks:{color:'#405060',font:{family:'JetBrains Mono',size:10},
+                 callback:v=>v>100?'$'+Math.round(v).toLocaleString():'$'+v}
+        }
+      }
+    }
+  });
+}
+
+function updateChart() {
+  const data = STATE.priceData[STATE.activeMarket];
+  chart.data.labels = data.map((_,i)=>i);
+  chart.data.datasets[0].data = data;
+  chart.update('none');
+  const m = MARKETS.find(x=>x.pair===STATE.activeMarket);
+  document.getElementById('chartPrice').textContent = '$'+m.price.toLocaleString(undefined,{maximumFractionDigits:2});
+  document.getElementById('chartChg').textContent = (m.chg>0?'+':'')+m.chg+'%';
+  document.getElementById('chartChg').className = 'chart-info '+(m.chg>=0?'pos':'neg');
+}
+
+// ── MARKET LIST ───────────────────────────────────────────────────────────
+function renderMarkets() {
+  const el = document.getElementById('marketList');
+  el.innerHTML = MARKETS.map(m=>`
+    <div class="market-item${m.pair===STATE.activeMarket?' active':''}" onclick="selectMarket('${m.pair}')">
+      <div>
+        <div class="market-name">${m.pair}</div>
+        <div class="market-sub">${m.base}</div>
+      </div>
+      <div>
+        <div class="market-price">$${m.price.toLocaleString(undefined,{maximumFractionDigits:m.price>100?2:4})}</div>
+        <div class="market-chg ${m.chg>=0?'pos':'neg'}">${m.chg>0?'+':''}${m.chg}%</div>
+      </div>
+    </div>`).join('');
+}
+
+function selectMarket(pair) {
+  STATE.activeMarket = pair;
+  const m = MARKETS.find(x=>x.pair===pair);
+  document.getElementById('chartSymbol').textContent = pair;
+  document.getElementById('chartInfo').textContent = `24h Vol: $${(Math.random()*30+5).toFixed(1)}B · Signals: Active`;
+  renderMarkets();
+  updateChart();
+}
+
+// ── SIGNALS ───────────────────────────────────────────────────────────────
+const SIGNAL_REASONS = [
+  'RSI oversold + MACD crossover','Bollinger Band squeeze detected',
+  'Volume spike + trend continuation','EMA 20/50 golden cross',
+  'Support level bounce confirmed','Resistance breakout with momentum',
+  'AI sentiment: bullish divergence','Multi-timeframe confluence signal',
+  'Order book imbalance detected','Funding rate arbitrage opportunity',
+];
+
+function generateSignal(forced) {
+  if(!STATE.agentRunning && !forced) return;
+  const m = MARKETS[Math.floor(Math.random()*MARKETS.length)];
+  const types = ['BUY','BUY','BUY','SELL','HOLD'];
+  const type = forced || types[Math.floor(Math.random()*types.length)];
+  const conf = 60+Math.floor(Math.random()*38);
+  const reason = SIGNAL_REASONS[Math.floor(Math.random()*SIGNAL_REASONS.length)];
+  const sig = { type, pair:m.pair, confidence:conf, reason, time:new Date().toLocaleTimeString(), ts:Date.now() };
+  STATE.signals.unshift(sig);
+  if(STATE.signals.length>50) STATE.signals.pop();
+  renderSignals();
+
+  // Auto-execute if high confidence
+  if(conf>78 && type!=='HOLD') {
+    setTimeout(()=>executeTrade(sig), 800+Math.random()*1200);
+  }
+}
+
+function renderSignals() {
+  const el = document.getElementById('signalsList');
+  el.innerHTML = STATE.signals.slice(0,20).map(s=>`
+    <div class="signal-row">
+      <span class="sig-type sig-${s.type.toLowerCase()}">${s.type}</span>
+      <span style="display:flex;flex-direction:column;gap:1px">
+        <span class="sig-pair">${s.pair}</span>
+        <span style="font-size:9px;color:var(--text3)">${s.reason}</span>
+      </span>
+      <span class="sig-confidence">${s.confidence}%</span>
+      <span class="sig-time">${s.time}</span>
+    </div>`).join('');
+  document.getElementById('sigCount').textContent = STATE.signals.length+' signals';
+}
+
+// ── TRADE EXECUTION ───────────────────────────────────────────────────────
+function executeTrade(sig) {
+  const risk = parseFloat(document.querySelector('.risk-slider').value)/100;
+  const size = STATE.portfolio * risk;
+  const pnlChange = (Math.random()-0.42)*size*0.05;
+  STATE.pnl += pnlChange;
+  STATE.trades++;
+  if(pnlChange>0) STATE.wins++;
+  STATE.portfolio += pnlChange;
+  STATE.kiteTxns++;
+  updateMetrics();
+  addKiteTx(sig, size, pnlChange);
+  showToast(`🤖 Executed ${sig.type} ${sig.pair}`,
+    `Size: $${size.toFixed(2)} · PnL: ${pnlChange>=0?'+':''}$${pnlChange.toFixed(2)}`);
+}
+
+function forceSignal(type) {
+  const m = MARKETS.find(x=>x.pair===STATE.activeMarket);
+  const sig = { type, pair:m.pair, confidence:85+Math.floor(Math.random()*14),
+    reason:'Manual override by operator', time:new Date().toLocaleTimeString() };
+  STATE.signals.unshift(sig);
+  renderSignals();
+  executeTrade(sig);
+}
+
+// ── KITE CHAIN ────────────────────────────────────────────────────────────
+const TX_TYPES = [
+  {icon:'💸', label:'Trade Settlement'},
+  {icon:'📜', label:'Attestation'},
+  {icon:'🔐', label:'Agent Auth'},
+  {icon:'🔎', label:'Risk Check'},
+  {icon:'📊', label:'Signal Proof'},
+];
+
+function addKiteTx(sig, size, pnl) {
+  const t = TX_TYPES[Math.floor(Math.random()*TX_TYPES.length)];
+  const hash = '0x'+[...Array(40)].map(()=>'0123456789abcdef'[Math.floor(Math.random()*16)]).join('');
+  STATE.kiteTxList.unshift({
+    icon:t.icon, label:t.label, hash, time:new Date().toLocaleTimeString(),
+    detail:`${sig.type} ${sig.pair} · $${size.toFixed(2)} · ${pnl>=0?'+':''}$${pnl.toFixed(2)} PnL`,
+    confirmed:true
+  });
+  if(STATE.kiteTxList.length>40) STATE.kiteTxList.pop();
+  renderKiteFeed();
+  document.getElementById('kiteCount').textContent = STATE.kiteTxns+' txns';
+}
+
+function renderKiteFeed() {
+  const el = document.getElementById('kiteList');
+  el.innerHTML = STATE.kiteTxList.slice(0,15).map(tx=>`
+    <div class="kite-tx">
+      <div class="kite-tx-header">
+        <div class="kite-icon">${tx.icon}</div>
+        <span class="kite-tx-type">${tx.label}</span>
+        <span class="kite-tx-time">${tx.time}</span>
+      </div>
+      <div class="kite-tx-detail">${tx.detail}</div>
+      <div class="kite-tx-hash">${tx.hash.slice(0,18)}...${tx.hash.slice(-6)}</div>
+      ${tx.confirmed?'<div class="kite-confirmed">✓ Confirmed on Kite chain</div>':''}
+    </div>`).join('');
+}
+
+function attestNow() {
+  STATE.kiteTxns++;
+  const hash = '0x'+[...Array(40)].map(()=>'0123456789abcdef'[Math.floor(Math.random()*16)]).join('');
+  STATE.kiteTxList.unshift({
+    icon:'📜', label:'Portfolio Attestation', hash,
+    time:new Date().toLocaleTimeString(),
+    detail:`Portfolio: $${STATE.portfolio.toFixed(2)} · P&L: ${STATE.pnl>=0?'+':''}$${STATE.pnl.toFixed(2)} · Trades: ${STATE.trades}`,
+    confirmed:true
+  });
+  renderKiteFeed();
+  updateMetrics();
+  showToast('⛓ Attestation submitted','Portfolio state committed to Kite chain');
+}
+
+// ── METRICS ───────────────────────────────────────────────────────────────
+function updateMetrics() {
+  document.getElementById('pnl').textContent = (STATE.pnl>=0?'+':'')+
+    '$'+Math.abs(STATE.pnl).toFixed(2);
+  document.getElementById('pnl').className = 'metric-value '+(STATE.pnl>=0?'pos':'neg');
+  const wr = STATE.trades>0?Math.round(STATE.wins/STATE.trades*100):0;
+  document.getElementById('winRate').textContent = wr+'%';
+  document.getElementById('winRate').className = 'metric-value '+(wr>=50?'pos':'neg');
+  document.getElementById('tradeCount').textContent = STATE.trades;
+  document.getElementById('kiteTxCount').textContent = STATE.kiteTxns;
+  document.getElementById('portfolioVal').textContent = '$'+STATE.portfolio.toFixed(2);
+  document.getElementById('openPos').textContent = Math.floor(Math.random()*4);
+  const sharpe = STATE.trades>3?(1.2+Math.random()*0.8).toFixed(2):'—';
+  document.getElementById('sharpe').textContent = sharpe;
+  const dd = STATE.pnl<0?Math.abs(STATE.pnl/STATE.portfolio*100).toFixed(1)+'%':'—';
+  document.getElementById('drawdown').textContent = dd;
+}
+
+function updateUptime() {
+  const s = Math.floor((Date.now()-STATE.startTime)/1000);
+  const m = Math.floor(s/60).toString().padStart(2,'0');
+  const sec = (s%60).toString().padStart(2,'0');
+  document.getElementById('uptime').textContent = m+':'+sec;
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(title, msg) {
+  let t = document.querySelector('.toast');
+  if(t) t.remove();
+  t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = `<div class="toast-title">${title}</div><div>${msg}</div>`;
+  document.body.appendChild(t);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.remove(), 3500);
+}
+
+// ── CONTROLS ──────────────────────────────────────────────────────────────
+function toggleAgent() {
+  STATE.agentRunning = !STATE.agentRunning;
+  const dot = document.getElementById('statusDot');
+  const btn = document.querySelector('button[onclick="toggleAgent()"]');
+  if(STATE.agentRunning) {
+    dot.style.background='var(--green)'; dot.style.boxShadow='0 0 8px var(--green)';
+    document.getElementById('statusText').textContent = 'Agent Active';
+    btn.textContent = 'Pause Agent';
+  } else {
+    dot.style.background='var(--amber)'; dot.style.boxShadow='0 0 8px var(--amber)';
+    document.getElementById('statusText').textContent = 'Agent Paused';
+    btn.textContent = 'Resume Agent';
+  }
+}
+
+function toggleOption(btn) { btn.classList.toggle('off'); }
+function setTF(btn, tf) {
+  document.querySelectorAll('.tf-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function changeTF(v) {}
+function showModal() { document.getElementById('modal').classList.remove('hidden'); }
+
+function generateDemoKey() {
+  const key = '0x'+[...Array(40)].map(()=>'0123456789abcdef'[Math.floor(Math.random()*16)]).join('');
+  document.getElementById('walletInput').value = key;
+}
+
+function launchAgent() {
+  const w = document.getElementById('walletInput').value || '0xdemo...';
+  STATE.wallet = w;
+  STATE.riskProfile = document.getElementById('riskInput').value;
+  document.getElementById('agentWallet').textContent = w.slice(0,12)+'...'+w.slice(-4);
+  document.getElementById('modal').classList.add('hidden');
+  // Kickoff initial chain auth
+  STATE.kiteTxList.push({
+    icon:'🔐', label:'Agent Authentication', hash:'0x'+[...Array(40)].map(()=>'0123456789abcdef'[Math.floor(Math.random()*16)]).join(''),
+    time:new Date().toLocaleTimeString(),
+    detail:`Agent ${w.slice(0,10)}... registered on Kite chain`,
+    confirmed:true
+  });
+  STATE.kiteTxns = 1;
+  renderKiteFeed();
+  document.getElementById('kiteCount').textContent = '1 txns';
+  showToast('🪁 Agent launched!', 'Registered on Kite chain · Trading active');
+}
+
+// ── MAIN LOOP ─────────────────────────────────────────────────────────────
+function mainLoop() {
+  tickPrices();
+  renderMarkets();
+  updateChart();
+  updateMetrics();
+  updateUptime();
+}
+
+function signalLoop() {
+  if(STATE.agentRunning && Math.random()>0.4) generateSignal();
+}
+
+initPrices();
+renderMarkets();
+initChart();
+
+setInterval(mainLoop, 1500);
+setInterval(signalLoop, 2800);
+setInterval(updateUptime, 1000);
+</script>
+</body>
+</html>

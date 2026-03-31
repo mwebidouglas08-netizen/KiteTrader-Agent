@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend/index.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/$1"
+    }
+  ],
+  "env": {
+    "KITE_RPC_URL": "@kite_rpc_url",
+    "AGENT_PRIVATE_KEY": "@agent_private_key",
+    "ATTESTATION_CONTRACT": "@attestation_contract"
+  }
+}
